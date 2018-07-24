@@ -85,6 +85,7 @@ rewrite_addr_ipv4(struct ip *ip, uint32_t rewrite_addr)
 	// IPヘッダの中のアドレス書き換え & チェックサム再計算
   ip->csum = csum16_sub(ip->csum, ~(ip->saddr & 0xffff));
   ip->csum = csum16_sub(ip->csum, ~(ip->saddr >> 16));
+  ip->daddr = rewrite_addr;
   ip->csum = csum16_add(ip->csum, ~(rewrite_addr & 0xffff));
   ip->csum = csum16_add(ip->csum, ~(rewrite_addr >> 16));
   
@@ -97,6 +98,7 @@ rewrite_addr_udp(struct udp *udp, struct ip *ip, uint32_t rewrite_addr)
 	// UDPのチェックサム再計算
   udp->csum = csum16_sub(udp->csum, ~(ip->saddr & 0xffff));
   udp->csum = csum16_sub(udp->csum, ~(ip->saddr >> 16));
+  
   udp->csum = csum16_add(udp->csum, ~(rewrite_addr & 0xffff));
   udp->csum = csum16_add(udp->csum, ~(rewrite_addr >> 16));
 	
