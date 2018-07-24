@@ -83,12 +83,11 @@ static inline __attribute__((always_inline)) void
 rewrite_addr_ipv4(struct ip *ip, uint32_t rewrite_addr)
 {
 	// IPヘッダの中のアドレス書き換え & チェックサム再計算
-  ip->csum = csum16_sub(ip->csum, ~(ip->saddr & 0xffff));
-  ip->csum = csum16_sub(ip->csum, ~(ip->saddr >> 16));
-  ip->daddr = rewrite_addr;
+  ip->csum = csum16_sub(ip->csum, ~(ip->daddr & 0xffff));
+  ip->csum = csum16_sub(ip->csum, ~(ip->daddr >> 16));
   ip->csum = csum16_add(ip->csum, ~(rewrite_addr & 0xffff));
   ip->csum = csum16_add(ip->csum, ~(rewrite_addr >> 16));
-  
+  ip->daddr = rewrite_addr;
 }
 
 static inline __attribute__((always_inline)) void
@@ -96,8 +95,8 @@ rewrite_addr_udp(struct udp *udp, struct ip *ip, uint32_t rewrite_addr)
 {
 	rewrite_addr_ipv4(ip, rewrite_addr);
 	// UDPのチェックサム再計算
-  udp->csum = csum16_sub(udp->csum, ~(ip->saddr & 0xffff));
-  udp->csum = csum16_sub(udp->csum, ~(ip->saddr >> 16));
+  udp->csum = csum16_sub(udp->csum, ~(ip->daddr & 0xffff));
+  udp->csum = csum16_sub(udp->csum, ~(ip->daddr >> 16));
   
   udp->csum = csum16_add(udp->csum, ~(rewrite_addr & 0xffff));
   udp->csum = csum16_add(udp->csum, ~(rewrite_addr >> 16));
@@ -109,8 +108,8 @@ rewrite_addr_tcp(struct tcp *tcp, struct ip *ip, uint32_t rewrite_addr)
 {
 	rewrite_addr_ipv4(ip, rewrite_addr);
 	// TCPのチェックサム再計算
-  tcp->csum = csum16_sub(tcp->csum, ~(ip->saddr & 0xffff));
-  tcp->csum = csum16_sub(tcp->csum, ~(ip->saddr >> 16));
+  tcp->csum = csum16_sub(tcp->csum, ~(ip->daddr & 0xffff));
+  tcp->csum = csum16_sub(tcp->csum, ~(ip->daddr >> 16));
   tcp->csum = csum16_add(tcp->csum, ~(rewrite_addr & 0xffff));
   tcp->csum = csum16_add(tcp->csum, ~(rewrite_addr >> 16));
 }
