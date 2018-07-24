@@ -177,29 +177,29 @@ lookup(struct vale_bpf_native_md *ctx)
   // IPアドレスとUDPのポート番号を元にハッシュ値を計算
   uint32_t hash = 0;
   hash = fnv_32_hash(&ip->saddr, sizeof(uint32_t), hash);
-  hash = fnv_32_hash(&port, sizeof(uint32_t), hash);
+  hash = fnv_32_hash(&port, sizeof(uint16_t), hash);
   hash = fnv_32_hash(&ip->proto, sizeof(uint8_t), hash);
 
   // % 2 で丸める
   uint32_t mod = hash % 2;
   if (mod == 0) {
     if (ip->proto == IPPROTO_UDP) {
-      rewrite_addr_udp(udp, ip, SERVER_IP3 );
+      rewrite_addr_udp(udp, ip, SERVER_IP1 );
     } else if (ip->proto == IPPROTO_TCP) {
-      rewrite_addr_tcp(tcp, ip, SERVER_IP3);
+      rewrite_addr_tcp(tcp, ip, SERVER_IP1);
     }
     
 
 
-	  return 2; // なんとか
+	  return 1; // なんとか
   } else if (mod == 1) {
       if (ip->proto == IPPROTO_UDP) {
-        rewrite_addr_udp(udp, ip, SERVER_IP3);
+        rewrite_addr_udp(udp, ip, SERVER_IP2);
       } else if (ip->proto == IPPROTO_TCP) {
-        rewrite_addr_tcp(tcp, ip, SERVER_IP3);
+        rewrite_addr_tcp(tcp, ip, SERVER_IP2);
       }
 	  // IP書き換え、チェックサム計算
-	  return 3; // なんとか
+	  return 2; // なんとか
   }
 
   /*
