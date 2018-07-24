@@ -65,21 +65,22 @@ lookup(struct vale_bpf_native_md *ctx)
   }
 
 
- csum16_sub(ip->csum, ~(ip->saddr & 0xffff));
- csum16_sub(ip->csum, ~(ip->saddr >> 16));
- ip->saddr=123456;
- csum16_add(ip->csum, ~(ip->saddr & 0xffff));
- csum16_add(ip->csum, ~(ip->saddr >>16));
- 
   bpf_trace_printk("%x\n", bpf_ntohl(ip->saddr));
   // ごにょごにょ IPアドレスとUDPのポートをそれぞれ出力
   struct udp *udp = (struct udp *)(ip + 1);
   if (udp + 1 > data_end) {
     return VALE_BPF_DROP;
-  }
-
+ }
 
   bpf_trace_printk("%d,%d\n",bpf_ntohs(udp->sport),bpf_ntohs(udp->dport));
-
+  ip->csum = csum16_sub(ip->csum, ~(ip->saddr & 0xffff));
+  ip->csum = csum16_sub(ip->csum, ~(ip->saddr >> 16));
+  udp->csum = csum16_sub(udp->csum, ~(ip->saddr & 0xffff));
+  udp->csum = csum16_sub(udp->csum, ~(ip->saddr >> 16));
+  ip->saddr=123456;  
+  ip->csum = csum16_add(ip->csum, ~(ip->saddr & 0xffff));
+  ip->csum = csum16_add(ip->csum, ~(ip->saddr >>16));
+  udp->csum = csum16_add(udp->csum, ~(ip->saddr & 0xffff));
+  udp->csum = csum16_add(udp->csum, ~(ip->saddr >> 16));
   return 1;
 }
