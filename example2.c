@@ -4,7 +4,8 @@
 #define IPPROTO_UDP 17
 
 #define SERVER_IP1 0x030000a0 // 10.0.0.3 network byteorder
-#define SERVER_IP2 0x020000a0 // 10.0.0.2 network byteorder
+#define SERVER_IP2 0x020000a0// 10.0.0.2 network byteorder
+#define SERVER_IP3 0x010000a0
 
 struct eth {
   uint8_t dst[6];
@@ -139,13 +140,13 @@ lookup(struct vale_bpf_native_md *ctx)
   uint16_t port;
 
   if (ip->proto == IPPROTO_UDP) {
-    udp = (struct udp *)(ip + 1)
+    udp = (struct udp *)(ip + 1);
     if (udp + 1 > data_end) {
       return VALE_BPF_DROP;
     }
     port = udp->sport;
-  } else if (ip->proto == IPPROTO_TCP)
-    tcp = (struct tcp *)(ip + 1)
+  } else if (ip->proto == IPPROTO_TCP) {
+    tcp = (struct tcp *)(ip + 1);
     if (tcp + 1 > data_end) {
       return VALE_BPF_DROP;
     }
@@ -157,9 +158,9 @@ lookup(struct vale_bpf_native_md *ctx)
   // サーバー側から来たパケット
   if (ingress_port != 0) {
     if (ip->proto == IPPROTO_UDP) {
-      rewrite_addr_udp(udp, ip, rewrite_addr);
+      rewrite_addr_udp(udp, ip, SERVER_IP3);
     } else if (ip->proto == IPPROTO_TCP) {
-      rewrite_addr_tcp(tcp, ip, rewrite_addr);
+      rewrite_addr_tcp(tcp, ip, SERVER_IP3);
     }
 
     return 0;
@@ -177,24 +178,22 @@ lookup(struct vale_bpf_native_md *ctx)
   uint32_t mod = hash % 2;
   if (mod == 0) {
     if (ip->proto == IPPROTO_UDP) {
-      rewrite_addr_udp(udp, ip, rewrite_addr);
+      rewrite_addr_udp(udp, ip, SERVER_IP3 );
     } else if (ip->proto == IPPROTO_TCP) {
-      rewrite_addr_tcp(tcp, ip, rewrite_addr);
+      rewrite_addr_tcp(tcp, ip, SERVER_IP3);
     }
-      
-		  
+    
 
 
-
-	  return // なんとか
+	  return 2; // なんとか
   } else if (mod == 1) {
       if (ip->proto == IPPROTO_UDP) {
-        rewrite_addr_udp(udp, ip, rewrite_addr);
+        rewrite_addr_udp(udp, ip, SERVER_IP3);
       } else if (ip->proto == IPPROTO_TCP) {
-        rewrite_addr_tcp(tcp, ip, rewrite_addr);
+        rewrite_addr_tcp(tcp, ip, SERVER_IP3);
       }
 	  // IP書き換え、チェックサム計算
-	  return // なんとか
+	  return 3; // なんとか
   }
 
   /*
