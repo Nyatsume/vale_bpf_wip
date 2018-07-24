@@ -1,5 +1,5 @@
 #include <net/vale_bpf_native_api.h>
-#define ETH_P_IP 0x0800
+#define ETH_P_IP 0x0008
 #define IPPROTO_TCP 6
 #define IPPROTO_UDP 17
 
@@ -121,16 +121,19 @@ lookup(struct vale_bpf_native_md *ctx)
   uint32_t ingress_port = ctx->ingress_port;
 
   if (data + sizeof(struct eth) > data_end) {
+    bpf_trace_printk("pkt dropped");	 
     return VALE_BPF_DROP;
   }
 
   struct eth *eth = data;
   if (eth->type != ETH_P_IP) {
+    bpf_trace_printk("pkt dropped");
     return VALE_BPF_DROP;
   }
 
   struct ip *ip = (struct ip *)(eth + 1);
   if (ip + 1 > data_end) {
+    bpf_trace_printk("pkt dropped");	 
     return VALE_BPF_DROP;
   }
 
@@ -142,16 +145,19 @@ lookup(struct vale_bpf_native_md *ctx)
   if (ip->proto == IPPROTO_UDP) {
     udp = (struct udp *)(ip + 1);
     if (udp + 1 > data_end) {
+	    bpf_trace_printk("pkt dropped");
       return VALE_BPF_DROP;
     }
     port = udp->sport;
   } else if (ip->proto == IPPROTO_TCP) {
     tcp = (struct tcp *)(ip + 1);
     if (tcp + 1 > data_end) {
+	    bpf_trace_printk("pkt dropped");
       return VALE_BPF_DROP;
     }
     port = tcp->sport;
   } else {
+　bpf_trace_printk("pkt dropped");
     return VALE_BPF_DROP;
   }
 
@@ -170,9 +176,9 @@ lookup(struct vale_bpf_native_md *ctx)
 
   // IPアドレスとUDPのポート番号を元にハッシュ値を計算
   uint32_t hash = 0;
-  hash = fnv_32_hash(ip->saddr, sizeof(uint32_t), hash);
-  hash = fnv_32_hash(port, sizeof(uint32_t), hash);
-  hash = fnv_32_hash(ip->proto, sizeof(uint8_t), hash);
+  hash = fnv_32_hash(&ip->saddr, sizeof(uint32_t), hash);
+  hash = fnv_32_hash(&port, sizeof(uint32_t), hash);
+  hash = fnv_32_hash(&ip->proto, sizeof(uint8_t), hash);
 
   // % 2 で丸める
   uint32_t mod = hash % 2;
@@ -208,6 +214,6 @@ lookup(struct vale_bpf_native_md *ctx)
   udp->csum = csum16_add(udp->csum, ~(ip->saddr & 0xffff));
   udp->csum = csum16_add(udp->csum, ~(ip->saddr >> 16));
   */
-
+  bpf_trace_printk("pkt dropped");
   return VALE_BPF_DROP;
 }
