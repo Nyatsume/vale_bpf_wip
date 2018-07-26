@@ -3,9 +3,9 @@
 #define IPPROTO_TCP 6
 #define IPPROTO_UDP 17
 
-#define SERVER_IP1 0x030000a0 // 10.0.0.3 network byteorder
-#define SERVER_IP2 0x020000a0// 10.0.0.2 network byteorder
-#define SERVER_IP3 0x010000a0
+#define VIP 0x0100000a // 10.0.0.3 network byteorder
+#define SERVER_IP2 0x0200000a// 10.0.0.2 network byteorder
+#define SERVER_IP3 0x0300000a
 
 struct eth {
   uint8_t dst[6];
@@ -186,16 +186,29 @@ lookup(struct vale_bpf_native_md *ctx)
   // % 2 で丸める
   uint32_t mod = hash % 2;
   if (mod == 0) {
+    eth->dst[0] = 0xa0;
+    eth->dst[1] = 0x36;
+    eth->dst[2] = 0x9f;
+    eth->dst[3] = 0x1a;
+    eth->dst[4] = 0x2d;
+    eth->dst[5] = 0xfc;
     if (ip->proto == IPPROTO_UDP) {
-      rewrite_addr_udp(udp, ip, SERVER_IP1 );
+      rewrite_addr_udp(udp, ip, VIP );
     } else if (ip->proto == IPPROTO_TCP) {
-      rewrite_addr_tcp(tcp, ip, SERVER_IP1);
+      rewrite_addr_tcp(tcp, ip, VIP);
     }
     
 
 
 	  return 1; // なんとか
   } else if (mod == 1) {
+     eth->dst[0] = 0xa0;
+     eth->dst[1] = 0x36;
+     eth->dst[2] = 0x9f;
+     eth->dst[3] = 0x1a;
+     eth->dst[4] = 0x2d;
+     eth->dst[5] = 0xfe;
+
       if (ip->proto == IPPROTO_UDP) {
         rewrite_addr_udp(udp, ip, SERVER_IP2);
       } else if (ip->proto == IPPROTO_TCP) {
