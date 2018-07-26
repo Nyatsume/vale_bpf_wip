@@ -103,7 +103,7 @@ rewrite_addr_udp(struct udp *udp, struct ip *ip, uint32_t rewrite_addr, uint32_t
   udp->csum = csum16_sub(udp->csum, ~(*addr & 0xffff));
   udp->csum = csum16_sub(udp->csum, ~(*addr >> 16));
   
-	rewrite_addr_ipv4(ip, rewrite_addr, *addr);
+	rewrite_addr_ipv4(ip, rewrite_addr, addr);
   udp->csum = csum16_add(udp->csum, ~(rewrite_addr & 0xffff));
   udp->csum = csum16_add(udp->csum, ~(rewrite_addr >> 16));
 	
@@ -116,7 +116,7 @@ rewrite_addr_tcp(struct tcp *tcp, struct ip *ip, uint32_t rewrite_addr, uint32_t
 	// TCPのチェックサム再計算
   tcp->csum = csum16_sub(tcp->csum, ~(*addr & 0xffff));
   tcp->csum = csum16_sub(tcp->csum, ~(*addr >> 16));
-	rewrite_addr_ipv4(ip, rewrite_addr, *addr);
+	rewrite_addr_ipv4(ip, rewrite_addr, addr);
   tcp->csum = csum16_add(tcp->csum, ~(rewrite_addr & 0xffff));
   tcp->csum = csum16_add(tcp->csum, ~(rewrite_addr >> 16));
 }
@@ -174,7 +174,7 @@ lookup(struct vale_bpf_native_md *ctx)
     if (ip->proto == IPPROTO_UDP) {
       rewrite_addr_udp(udp, ip, VIP, &ip->saddr);
     } else if (ip->proto == IPPROTO_TCP) {
-      rewrite_addr_tcp(tcp, ip, VIP,ip->saddr);
+      rewrite_addr_tcp(tcp, ip, VIP,&ip->saddr);
     }
 
     return 0;
@@ -198,9 +198,9 @@ lookup(struct vale_bpf_native_md *ctx)
     eth->dst[4] = 0x2d;
     eth->dst[5] = 0xfc;
     if (ip->proto == IPPROTO_UDP) {
-      rewrite_addr_udp(udp, ip, SERVER_IP2, ip->daddr );
+      rewrite_addr_udp(udp, ip, SERVER_IP2,&ip->daddr );
     } else if (ip->proto == IPPROTO_TCP) {
-      rewrite_addr_tcp(tcp, ip, SERVER_IP2, ip->daddr);
+      rewrite_addr_tcp(tcp, ip, SERVER_IP2, &ip->daddr);
     }
     
 
@@ -215,9 +215,9 @@ lookup(struct vale_bpf_native_md *ctx)
      eth->dst[5] = 0xfe;
 
       if (ip->proto == IPPROTO_UDP) {
-        rewrite_addr_udp(udp, ip, SERVER_IP3, ip->daddr);
+        rewrite_addr_udp(udp, ip, SERVER_IP3, &ip->daddr);
       } else if (ip->proto == IPPROTO_TCP) {
-        rewrite_addr_tcp(tcp, ip, SERVER_IP3, ip->daddr);
+        rewrite_addr_tcp(tcp, ip, SERVER_IP3, &ip->daddr);
       }
 	  // IP書き換え、チェックサム計算
 	  return 2; // なんとか
