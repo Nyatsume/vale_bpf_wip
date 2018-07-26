@@ -2,6 +2,8 @@
 #define ETH_P_IP 0x0008
 #define IPPROTO_TCP 6
 #define IPPROTO_UDP 17
+#define DIRECTION_IN 0
+#define DIRECTION_OUT 1
 
 #define VIP 0x0100000a // 10.0.0.3 network byteorder
 #define SERVER_IP2 0x0200000a// 10.0.0.2 network byteorder
@@ -80,38 +82,41 @@ csum16_sub(uint16_t csum, uint16_t addend)
 }
 
 static inline __attribute__((always_inline)) void
-rewrite_addr_ipv4(struct ip *ip, uint32_t rewrite_addr)
+rewrite_addr_ipv4(struct ip *ip, uint32_t rewrite_addr,uint32_t *addr)
 {
 	// IPヘッダの中のアドレス書き換え & チェックサム再計算
-  ip->csum = csum16_sub(ip->csum, ~(ip->daddr & 0xffff));
-  ip->csum = csum16_sub(ip->csum, ~(ip->daddr >> 16));
+
+  
+  ip->csum = csum16_sub(ip->csum, ~(*addr & 0xffff));
+  ip->csum = csum16_sub(ip->csum, ~(*addr >> 16));
   ip->csum = csum16_add(ip->csum, ~(rewrite_addr & 0xffff));
   ip->csum = csum16_add(ip->csum, ~(rewrite_addr >> 16));
-  ip->daddr = rewrite_addr;
-}
+   *addr = rewrite_addr;
+ }
+
 
 static inline __attribute__((always_inline)) void
-rewrite_addr_udp(struct udp *udp, struct ip *ip, uint32_t rewrite_addr)
+rewrite_addr_udp(struct udp *udp, struct ip *ip, uint32_t rewrite_addr, uint32_t *addr)
 {
 	
 	// UDPのチェックサム再計算
-  udp->csum = csum16_sub(udp->csum, ~(ip->daddr & 0xffff));
-  udp->csum = csum16_sub(udp->csum, ~(ip->daddr >> 16));
+  udp->csum = csum16_sub(udp->csum, ~(*addr & 0xffff));
+  udp->csum = csum16_sub(udp->csum, ~(*addr >> 16));
   
-	rewrite_addr_ipv4(ip, rewrite_addr);
+	rewrite_addr_ipv4(ip, rewrite_addr, *addr);
   udp->csum = csum16_add(udp->csum, ~(rewrite_addr & 0xffff));
   udp->csum = csum16_add(udp->csum, ~(rewrite_addr >> 16));
 	
 }
 
 static inline __attribute__((always_inline)) void
-rewrite_addr_tcp(struct tcp *tcp, struct ip *ip, uint32_t rewrite_addr)
+rewrite_addr_tcp(struct tcp *tcp, struct ip *ip, uint32_t rewrite_addr, uint32_t *addr)
 {
 
 	// TCPのチェックサム再計算
-  tcp->csum = csum16_sub(tcp->csum, ~(ip->daddr & 0xffff));
-  tcp->csum = csum16_sub(tcp->csum, ~(ip->daddr >> 16));
-	rewrite_addr_ipv4(ip, rewrite_addr);
+  tcp->csum = csum16_sub(tcp->csum, ~(*addr & 0xffff));
+  tcp->csum = csum16_sub(tcp->csum, ~(*addr >> 16));
+	rewrite_addr_ipv4(ip, rewrite_addr, *addr);
   tcp->csum = csum16_add(tcp->csum, ~(rewrite_addr & 0xffff));
   tcp->csum = csum16_add(tcp->csum, ~(rewrite_addr >> 16));
 }
@@ -167,9 +172,9 @@ lookup(struct vale_bpf_native_md *ctx)
   // サーバー側から来たパケット
   if (ingress_port != 0) {
     if (ip->proto == IPPROTO_UDP) {
-      rewrite_addr_udp(udp, ip, SERVER_IP3);
+      rewrite_addr_udp(udp, ip, VIP, &ip->saddr);
     } else if (ip->proto == IPPROTO_TCP) {
-      rewrite_addr_tcp(tcp, ip, SERVER_IP3);
+      rewrite_addr_tcp(tcp, ip, VIP,ip->saddr);
     }
 
     return 0;
@@ -193,9 +198,9 @@ lookup(struct vale_bpf_native_md *ctx)
     eth->dst[4] = 0x2d;
     eth->dst[5] = 0xfc;
     if (ip->proto == IPPROTO_UDP) {
-      rewrite_addr_udp(udp, ip, VIP );
+      rewrite_addr_udp(udp, ip, SERVER_IP2, ip->daddr );
     } else if (ip->proto == IPPROTO_TCP) {
-      rewrite_addr_tcp(tcp, ip, VIP);
+      rewrite_addr_tcp(tcp, ip, SERVER_IP2, ip->daddr);
     }
     
 
@@ -210,9 +215,9 @@ lookup(struct vale_bpf_native_md *ctx)
      eth->dst[5] = 0xfe;
 
       if (ip->proto == IPPROTO_UDP) {
-        rewrite_addr_udp(udp, ip, SERVER_IP2);
+        rewrite_addr_udp(udp, ip, SERVER_IP3, ip->daddr);
       } else if (ip->proto == IPPROTO_TCP) {
-        rewrite_addr_tcp(tcp, ip, SERVER_IP2);
+        rewrite_addr_tcp(tcp, ip, SERVER_IP3, ip->daddr);
       }
 	  // IP書き換え、チェックサム計算
 	  return 2; // なんとか
