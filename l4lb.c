@@ -5,7 +5,6 @@
 #define DIRECTION_IN 0
 #define DIRECTION_OUT 1
 
-#define VIP 0x0100000a // 10.0.0.3 network byteorder
 #define SERVER_IP2 0x0200000a// 10.0.0.2 network byteorder
 #define SERVER_IP3 0x0300000a
 
@@ -57,10 +56,11 @@ struct udp {
 struct val {
   uint32_t rip;
   uint8_t mac[6];
-  uint8_t _pad[6];
+  uint8_t port;
+  uint8_t _pad[5];
 };
 
-BPF_TABLE("percpu_array",uint32_t, struct val, table, 3);
+BPF_TABLE("array",uint32_t, struct val, table, 4);
 
 #define FNV_32_PRIME ((uint32_t) 0x01000193UL)
 static inline __attribute__((always_inline)) uint32_t
@@ -129,6 +129,17 @@ rewrite_addr_tcp(struct tcp *tcp, struct ip *ip, uint32_t rewrite_addr, uint32_t
   tcp->csum = csum16_add(tcp->csum, ~(rewrite_addr >> 16));
 }
 
+static inline __attribute__((always_inline)) uint32_t calc_hash(uint32_t sip, uint32_t dip, uint16_t sport, uint16_t dport, uint8_t proto)
+{
+  uint32_t hash = 0;
+  hash = fnv_32_hash(&sip, sizeof(uint32_t), hash);
+  hash = fnv_32_hash(&dip, sizeof(uint32_t), hash);
+  hash = fnv_32_hash(&sport, sizeof(uint16_t), hash);
+  hash = fnv_32_hash(&dport, sizeof(uint16_t), hash);
+  hash = fnv_32_hash(&proto, sizeof(uint8_t), hash);
+  return hash % 3;
+}
+
 uint32_t
 lookup(struct vale_bpf_native_md *ctx)
 {
@@ -153,6 +164,8 @@ lookup(struct vale_bpf_native_md *ctx)
     bpf_trace_printk("pkt dropped");	 
     return VALE_BPF_DROP;
   }
+
+  /*
   struct val *v;
   uint32_t key = 0;
   v = table.lookup(&key);
@@ -160,10 +173,16 @@ lookup(struct vale_bpf_native_md *ctx)
     return VALE_BPF_DROP;
   }
   bpf_trace_printk("%x\n",v->rip);
+  */
+
   // ごにょごにょ IPアドレスとUDPのポートをそれぞれ出力
   struct udp *udp;
   struct tcp *tcp;
   uint16_t port;
+  
+  struct val *v;
+  uint32_t key = 3;
+  uint32_t mod;
 
   if (ip->proto == IPPROTO_UDP) {
     udp = (struct udp *)(ip + 1);
@@ -172,40 +191,57 @@ lookup(struct vale_bpf_native_md *ctx)
       return VALE_BPF_DROP;
     }
     port = udp->sport;
+
+    if (ingress_port != 0) {
+      v = table.lookup(&key);
+      if (v == NULL) {
+	return VALE_BPF_DROP;
+      }
+      rewrite_addr_udp(udp, ip, v->rip, &ip->saddr);
+      return 0;
+    }
+    mod = calc_hash(ip->saddr, ip->daddr, udp->sport, udp->dport, ip->proto);
+    v = table.lookup(&mod);
+    if(v == NULL) {
+      return VALE_BPF_DROP;
+    }
+    rewrite_addr_udp(udp, ip, v->rip, &ip->daddr);
+    return v->port;
   } else if (ip->proto == IPPROTO_TCP) {
     tcp = (struct tcp *)(ip + 1);
     if (tcp + 1 > data_end) {
-	    bpf_trace_printk("pkt dropped");
+      bpf_trace_printk("pkt dropped");
       return VALE_BPF_DROP;
     }
     port = tcp->sport;
+    if (ingress_port != 0) {
+      v = table.lookup(&key);
+      if (v == NULL) {
+	return VALE_BPF_DROP;
+      }
+      rewrite_addr_tcp(tcp, ip, v->rip, &ip->saddr);
+      return 0;
+    }
+
+    mod = calc_hash(ip->saddr, ip->daddr, tcp->sport, tcp->dport, ip->proto);
+    v = table.lookup(&mod);
+    if(v == NULL) {
+      return VALE_BPF_DROP;
+    }
+    rewrite_addr_tcp(tcp, ip, v->rip, &ip->daddr);
+    return v->port;
+    
   } else {
-　bpf_trace_printk("pkt dropped");
+　  bpf_trace_printk("pkt dropped");
     return VALE_BPF_DROP;
   }
 
-  // サーバー側から来たパケット
-  if (ingress_port != 0) {
-    if (ip->proto == IPPROTO_UDP) {
-      rewrite_addr_udp(udp, ip, VIP, &ip->saddr);
-    } else if (ip->proto == IPPROTO_TCP) {
-      rewrite_addr_tcp(tcp, ip, VIP,&ip->saddr);
-    }
- 
-    return 0;
-  
-  }
    
   // これいこうの処理はクライアント側からきたやつ
 
   // IPアドレスとUDPのポート番号を元にハッシュ値を計算
-  uint32_t hash = 0;
-  hash = fnv_32_hash(&ip->saddr, sizeof(uint32_t), hash);
-  hash = fnv_32_hash(&port, sizeof(uint16_t), hash);
-  hash = fnv_32_hash(&ip->proto, sizeof(uint8_t), hash);
 
   // % 2 で丸める
-  uint32_t mod = hash % 2;
   if (mod == 0) {
     eth->dst[0] = 0xa0;
     eth->dst[1] = 0x36;
