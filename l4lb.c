@@ -5,8 +5,7 @@
 #define DIRECTION_IN 0
 #define DIRECTION_OUT 1
 
-#define SERVER_IP2 0x0200000a// 10.0.0.2 network byteorder
-#define SERVER_IP3 0x0300000a
+
 
 struct eth {
   uint8_t dst[6];
@@ -242,6 +241,7 @@ lookup(struct vale_bpf_native_md *ctx)
   // IPアドレスとUDPのポート番号を元にハッシュ値を計算
 
   // % 2 で丸める
+  /*
   if (mod == 0) {
     eth->dst[0] = 0xa0;
     eth->dst[1] = 0x36;
