@@ -216,9 +216,23 @@ lookup(struct vale_bpf_native_md *ctx)
     if (ingress_port != 0) {
       v = table.lookup(&key);
       if (v == NULL) {
-	return VALE_BPF_DROP;
+				return VALE_BPF_DROP;
       }
       rewrite_addr_tcp(tcp, ip, v->rip, &ip->saddr);
+			#vip 10.0.0.1 a0:36:9f:1a:2f:24
+			eth->src[0] = 0xa0;
+			eth->src[1] = 0x36;
+			eth->src[2] = 0x9f;
+			eth->src[3] = 0x1a;
+			eth->src[4] = 0x2f;
+			eth->src[5] = 0x24;
+			#client vip 10.0.0.10 a0:36:9f:1a:2d:30
+			eth->dst[0] = 0xa0;
+			eth->dst[1] = 0x36;
+			eth->dst[2] = 0x9f;
+			eth->dst[3] = 0x1a;
+			eth->dst[4] = 0x2d;
+			eth->dst[5] = 0x30;
       return 0;
     }
 
